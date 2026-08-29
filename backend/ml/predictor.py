@@ -1,0 +1,134 @@
+"""
+Real-time Reversal Predictor & Signal Classifier.
+
+Loads the serialized XGBoost model and produces low-latency inference on live market features.
+Maps model probabilities and order flow factors to actionable quant signals:
+- HIGH_CONVICTION_BEARISH_REVERSAL
+- HIGH_CONVICTION_BULLISH_REVERSAL
+- MODERATE_REVERSAL_WATCH
+- NEUTRAL_TREND_CONTINUATION
+"""
+import logging
+import sys
+from pathlib import Path
+
+# Ensure backend root is in sys.path
+BASE_DIR = Path(__file__).resolve().parent.parent
+if str(BASE_DIR) not in sys.path:
+    sys.path.insert(0, str(BASE_DIR))
+
+from typing import Dict, List, Optional
+import numpy as np
+import xgboost as xgb
+import joblib
+
+from config import settings
+from ml.feature_pipeline import extract_features_from_dict
+
+logger = logging.getLogger("predictor")
+
+
+class ReversalPredictor:
+    def __init__(self, model_path: Optional[Path] = None, scaler_path: Optional[Path] = None):
+        self.model_path = model_path or settings.MODEL_PATH
+        self.scaler_path = scaler_path or settings.SCALER_PATH
+        
+        self.model: Optional[xgb.XGBClassifier] = None
+        self.scaler = None
+        self._load_or_initialize_model()
+
+    def _load_or_initialize_model(self):
+        """Loads serialized model/scaler or bootstraps default model weights."""
+        if self.model_path.exists() and self.scaler_path.exists():
+            try:
+                self.model = xgb.XGBClassifier()
+                self.model.load_model(str(self.model_path))
+                self.scaler = joblib.load(str(self.scaler_path))
+                logger.info(f"Loaded trained XGBoost model from {self.model_path}")
+                return
+            except Exception as e:
+                logger.warning(f"Error loading model from disk: {e}. Reinitializing default model.")
+
+        # Fallback: Initialize lightweight trained model immediately
+        logger.info("Initializing baseline XGBoost model for live inference...")
+        from ml.train_model import train_and_save_model
+        try:
+            train_and_save_model()
+            self.model = xgb.XGBClassifier()
+            self.model.load_model(str(self.model_path))
+            self.scaler = joblib.load(str(self.scaler_path))
+        except Exception as e:
+            logger.error(f"Fallback training failed: {e}")
+
+    def predict(self, indicator_dict: dict, active_factors: Optional[List[str]] = None) -> Dict:
+        """
+        Accepts real-time indicators, standardizes features, and executes inference.
+        Returns:
+            {
+                "probability": float (0.000 to 1.000),
+                "signal": str,
+                "factors": list[str]
+            }
+        """
+        active_factors = list(active_factors or [])
+        features_1d = extract_features_from_dict(indicator_dict).reshape(1, -1)
+
+        # Scale features if scaler exists
+        if self.scaler:
+            try:
+                features_1d = self.scaler.transform(features_1d)
+            except Exception:
+                pass
+
+        # Inference
+        probability = 0.50
+        if self.model:
+            try:
+                prob_arr = self.model.predict_proba(features_1d)[0]
+                probability = float(prob_arr[1])
+            except Exception as e:
+                logger.error(f"Prediction inference error: {e}")
+                probability = 0.50
+
+        # Classify reversal direction and signal conviction
+        cvd_1m = indicator_dict.get("cvd_1m_delta", 0.0)
+        imbalance = indicator_dict.get("orderbook_imbalance", 0.0)
+        rsi = indicator_dict.get("rsi_14", 50.0)
+        vwap_dist = indicator_dict.get("vwap_distance_pct", 0.0)
+
+        # Identify additional contextual factors
+        if rsi > 70.0 and "RSI Overbought (>70)" not in active_factors:
+            active_factors.append("RSI Overbought (>70)")
+        elif rsi < 30.0 and "RSI Oversold (<30)" not in active_factors:
+            active_factors.append("RSI Oversold (<30)")
+
+        if vwap_dist > 0.4 and "Extended VWAP Premium (+0.4%)" not in active_factors:
+            active_factors.append("Extended VWAP Premium (+0.4%)")
+        elif vwap_dist < -0.4 and "Extended VWAP Discount (-0.4%)" not in active_factors:
+            active_factors.append("Extended VWAP Discount (-0.4%)")
+
+        # Determine Signal Label
+        is_bearish_divergence = any("Bearish" in f for f in active_factors)
+        is_bullish_divergence = any("Bullish" in f for f in active_factors)
+
+        if probability >= 0.70:
+            if is_bearish_divergence or (cvd_1m < 0 and imbalance < -0.2) or rsi > 68:
+                signal = "HIGH_CONVICTION_BEARISH_REVERSAL"
+                if "Order Book Ask Stack" not in active_factors and imbalance < -0.15:
+                    active_factors.append("Order Book Ask Stack")
+            elif is_bullish_divergence or (cvd_1m > 0 and imbalance > 0.2) or rsi < 32:
+                signal = "HIGH_CONVICTION_BULLISH_REVERSAL"
+                if "Order Book Bid Stack" not in active_factors and imbalance > 0.15:
+                    active_factors.append("Order Book Bid Stack")
+            else:
+                signal = "HIGH_CONVICTION_REVERSAL_ALERT"
+        elif probability >= 0.55:
+            signal = "MODERATE_REVERSAL_WATCH"
+        else:
+            signal = "NEUTRAL_TREND_CONTINUATION"
+
+        return {
+            "probability": round(probability, 3),
+            "signal": signal,
+            "factors": active_factors
+        }
