@@ -63,16 +63,14 @@ class ReversalPredictor:
             except Exception as e:
                 logger.warning(f"Error loading model from disk: {e}. Reinitializing default model.")
 
-        # Fallback: Initialize lightweight trained model immediately
-        logger.info("Initializing baseline XGBoost model for live inference...")
-        from ml.train_model import train_and_save_model
-        try:
-            train_and_save_model()
-            self.model = xgb.XGBClassifier()
-            self.model.load_model(str(self.model_path))
-            self.scaler = joblib.load(str(self.scaler_path))
-        except Exception as e:
-            logger.error(f"Fallback training failed: {e}")
+        # No usable artifacts. Auto-training here used to silently produce a model
+        # that predicted "no reversal" for every input, so predict() now returns a
+        # neutral 0.5 instead of pretending to have an opinion.
+        target = self.symbol or "BTCUSDT"
+        logger.error(
+            f"No trained model for {target} at {self.model_path}. "
+            f"Predictions will be neutral until you run: python ml/train_model_v2.py {target}"
+        )
 
     def predict(self, indicator_dict: dict, active_factors: Optional[List[str]] = None) -> Dict:
         """

@@ -182,12 +182,17 @@ class ContinualLearningEngine:
 
     def _execute_retraining_sync(self):
         """Runs scikit-learn / XGBoost training in a separate thread."""
+        symbol = getattr(self, "symbol", None) or settings.DEFAULT_SYMBOL
         if len(self.replay_X) < 30:
             # Seed with historical data if replay buffer is small
-            from ml.train_model import fetch_binance_klines
+            from ml.train_model_v2 import load_local_klines
             from ml.feature_pipeline import generate_feature_matrix_from_df
-            df = fetch_binance_klines(symbol="BTCUSDT", limit=1000)
-            X_hist, y_hist = generate_feature_matrix_from_df(df)
+            df = load_local_klines(symbol)
+            # Without an explicit threshold this defaults to 0.5%, which labels
+            # nothing at a 1m/3-bar horizon and yields an all-negative training set.
+            X_hist, y_hist = generate_feature_matrix_from_df(
+                df, reversal_threshold_pct=settings.reversal_threshold_for(symbol)
+            )
             
             X_combined = np.vstack([X_hist.values] + ([np.array(self.replay_X)] if self.replay_X else []))
             y_combined = np.concatenate([y_hist.values] + ([np.array(self.replay_y)] if self.replay_y else []))
@@ -220,9 +225,10 @@ class ContinualLearningEngine:
 
         clf.fit(X_scaled, y_combined, sample_weight=recency_weights)
 
-        # Atomic save to disk
-        clf.save_model(str(settings.MODEL_PATH))
-        joblib.dump(scaler, str(settings.SCALER_PATH))
+        # Save to this symbol's own artifacts, not the shared legacy pair, so
+        # retraining one symbol cannot overwrite another's model.
+        clf.save_model(str(settings.model_path_for(symbol)))
+        joblib.dump(scaler, str(settings.scaler_path_for(symbol)))
 
         # Hot-reload in predictor in memory
         self.predictor.model = clf
