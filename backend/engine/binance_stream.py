@@ -57,7 +57,9 @@ class BinanceFuturesStreamConsumer:
         Combined stream endpoint on Binance Futures:
         Streams: <symbol>@aggTrade / <symbol>@depth5@100ms
         """
-        stream_names = f"{self.symbol}@aggTrade/{self.symbol}@depth5@100ms"
+        # @trade, not @aggTrade: the aggTrade stream returns no messages on
+        # this endpoint, leaving CVD permanently at zero with no error raised.
+        stream_names = f"{self.symbol}@trade/{self.symbol}@depth5@100ms"
         uri = f"{settings.BINANCE_FUTURES_STREAM_URL}?streams={stream_names}"
 
         reconnect_delay = 1.0
@@ -109,7 +111,7 @@ class BinanceFuturesStreamConsumer:
         event_type = payload.get("e")
         
         # 1. Handle Aggregated Trade (@aggTrade)
-        if event_type == "aggTrade" or "@aggTrade" in stream:
+        if event_type in ("trade", "aggTrade") or "@trade" in stream:
             price = float(payload["p"])
             quantity = float(payload["q"])
             is_buyer_maker = bool(payload["m"])

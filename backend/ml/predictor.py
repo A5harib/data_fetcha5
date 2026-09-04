@@ -29,7 +29,21 @@ logger = logging.getLogger("predictor")
 
 
 class ReversalPredictor:
-    def __init__(self, model_path: Optional[Path] = None, scaler_path: Optional[Path] = None):
+    def __init__(self, model_path: Optional[Path] = None, scaler_path: Optional[Path] = None,
+                 symbol: Optional[str] = None):
+        # A per-symbol model is used when one exists on disk; BTC and XAU have
+        # different volume scales, so a shared scaler misplaces gold's CVD.
+        # Falls back to the legacy shared artifacts.
+        if symbol and not model_path and not scaler_path:
+            sym_model = settings.model_path_for(symbol)
+            sym_scaler = settings.scaler_path_for(symbol)
+            if sym_model.exists() and sym_scaler.exists():
+                model_path, scaler_path = sym_model, sym_scaler
+            else:
+                logger.warning(f"No per-symbol model for {symbol}; using shared model. "
+                               f"Train one with: python ml/train_model_v2.py {symbol}")
+
+        self.symbol = symbol
         self.model_path = model_path or settings.MODEL_PATH
         self.scaler_path = scaler_path or settings.SCALER_PATH
         

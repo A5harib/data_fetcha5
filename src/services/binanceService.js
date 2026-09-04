@@ -7,7 +7,8 @@ export const BINANCE_MARKETS = [
   { symbol: 'BTCUSDT', name: 'Bitcoin', sector: 'Layer 1' },
   { symbol: 'ETHUSDT', name: 'Ethereum', sector: 'Smart Contracts' },
   { symbol: 'SOLUSDT', name: 'Solana', sector: 'High-speed L1' },
-  { symbol: 'PAXGUSDT', name: 'Gold (XAU / PAXG)', sector: 'Precious Metals' },
+  { symbol: 'XAUUSDT', name: 'Gold (XAU Perp)', sector: 'Precious Metals' },
+  { symbol: 'PAXGUSDT', name: 'PAX Gold (PAXG)', sector: 'Precious Metals' },
   { symbol: 'BNBUSDT', name: 'BNB', sector: 'Ecosystem' },
   { symbol: 'XRPUSDT', name: 'XRP', sector: 'Payments' },
   { symbol: 'DOGEUSDT', name: 'Dogecoin', sector: 'Meme' },
@@ -32,13 +33,29 @@ export const TIMEFRAMES = [
 export function normalizeBinanceSymbol(raw) {
   if (!raw) return 'BTCUSDT';
   const clean = raw.trim().toUpperCase().replace('X:', '').replace('C:', '').replace('-', '').replace('/', '');
-  if (clean === 'XAU' || clean === 'XAUUSD' || clean === 'GOLD' || clean === 'PAXG') return 'PAXGUSDT';
+  if (clean === 'XAU' || clean === 'XAUUSD' || clean === 'GOLD') return 'XAUUSDT';
+  if (clean === 'PAXG') return 'PAXGUSDT';
   if (clean === 'BTC' || clean === 'BTCUSD') return 'BTCUSDT';
   if (clean === 'ETH' || clean === 'ETHUSD') return 'ETHUSDT';
   if (clean === 'SOL' || clean === 'SOLUSD') return 'SOLUSDT';
   if (clean.endsWith('USDT')) return clean;
   if (clean.endsWith('USD')) return clean + 'T';
   return `${clean}USDT`;
+}
+
+// ponytail: XAU/XAG are USDS-M TradFi perps, not spot listings. Only the host differs,
+// so route by symbol instead of forking the service. Add more symbols here if Binance
+// lists further TradFi perps.
+const FUTURES_ONLY = new Set(['XAUUSDT', 'XAGUSDT']);
+
+export function isFuturesSymbol(symbol) {
+  return FUTURES_ONLY.has(symbol);
+}
+
+function restBase(symbol) {
+  return isFuturesSymbol(symbol)
+    ? 'https://fapi.binance.com/fapi/v1'
+    : 'https://api.binance.com/api/v3';
 }
 
 /**
@@ -50,7 +67,7 @@ export async function fetchBinanceKlines(rawSymbol, timeframe = '1D') {
   const interval = tfObj.interval;
   const limit = (interval === '1s' || interval === '1m' || interval === '5m' || interval === '15m') ? 350 : 500;
 
-  const url = `https://api.binance.com/api/v3/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
+  const url = `${restBase(symbol)}/klines?symbol=${symbol}&interval=${interval}&limit=${limit}`;
   const res = await fetch(url);
 
   if (!res.ok) {
@@ -113,7 +130,7 @@ export async function fetchBinanceKlines(rawSymbol, timeframe = '1D') {
  */
 export async function fetchBinance24hStats(rawSymbol) {
   const symbol = normalizeBinanceSymbol(rawSymbol);
-  const res = await fetch(`https://api.binance.com/api/v3/ticker/24hr?symbol=${symbol}`);
+  const res = await fetch(`${restBase(symbol)}/ticker/24hr?symbol=${symbol}`);
   if (!res.ok) return null;
   const data = await res.json();
   return {
@@ -139,11 +156,18 @@ export async function fetchBinance24hStats(rawSymbol) {
  * 4. <symbol>@ticker (24h stats)
  */
 export function connectBinanceMultiStream(rawSymbol, timeframe, { onKline, onDepth, onTrade, onTicker }) {
-  const symbol = normalizeBinanceSymbol(rawSymbol).toLowerCase();
+  const upper = normalizeBinanceSymbol(rawSymbol);
+  const symbol = upper.toLowerCase();
   const tfObj = TIMEFRAMES.find(t => t.label === timeframe) || { interval: '1d' };
   const interval = tfObj.interval || '1d';
 
-  const streamUrl = `wss://stream.binance.com:9443/stream?streams=${symbol}@kline_${interval}/${symbol}@depth20@100ms/${symbol}@trade/${symbol}@ticker`;
+  // ponytail: futures has no @trade stream, @aggTrade is the equivalent and carries the
+  // same p/q/T/m fields (id is `a` not `t`).
+  const futures = isFuturesSymbol(upper);
+  const wsHost = futures ? 'wss://fstream.binance.com' : 'wss://stream.binance.com:9443';
+  const tradeStream = futures ? 'aggTrade' : 'trade';
+
+  const streamUrl = `${wsHost}/stream?streams=${symbol}@kline_${interval}/${symbol}@depth20@100ms/${symbol}@${tradeStream}/${symbol}@ticker`;
 
   let ws = null;
   let isClosedManually = false;
@@ -198,10 +222,10 @@ export function connectBinanceMultiStream(rawSymbol, timeframe, { onKline, onDep
         }
 
         // Live Real-Time Trade Stream
-        else if (stream.includes('@trade')) {
+        else if (stream.includes('@trade') || stream.includes('@aggTrade')) {
           if (onTrade && data.p && data.q) {
             onTrade({
-              id: data.t,
+              id: data.t ?? data.a,
               time: new Date(data.T).toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' }),
               price: parseFloat(data.p),
               size: parseFloat(data.q),

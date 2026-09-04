@@ -171,7 +171,7 @@ export default function TerminalHeader({
                 <input 
                   type="text" 
                   className="w-full bg-[#202630] border border-[#2b313a] focus:border-[#fcd535] rounded px-3 pl-9 py-2 text-xs text-[#eaecef] outline-none placeholder-[#5e6673]" 
-                  placeholder="Search BTC, ETH, SOL, XAU (Gold), DOGE, XRP..." 
+                  placeholder="Search BTC, ETH, SOL, XAU (Gold Perp), PAXG, DOGE..." 
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
                   autoFocus

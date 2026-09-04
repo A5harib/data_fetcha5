@@ -8,7 +8,8 @@ import {
   fetchBinanceKlines,
   fetchBinance24hStats,
   connectBinanceMultiStream,
-  normalizeBinanceSymbol
+  normalizeBinanceSymbol,
+  isFuturesSymbol
 } from './services/binanceService';
 import { AlertCircle, RefreshCw } from 'lucide-react';
 
@@ -94,16 +95,35 @@ export default function App() {
       setPriceChangePct(binanceRes.priceChangePct);
       setStats24h(stats);
 
-      const isGold = normSym === 'PAXGUSDT';
+      const isXau = normSym === 'XAUUSDT';
+      const isPaxg = normSym === 'PAXGUSDT';
+      const isFut = isFuturesSymbol(normSym);
+
+      let name, description, marketCap, sector;
+      if (isXau) {
+        name = 'Gold (XAU / USDT Perp)';
+        description = 'Binance USDS-M TradFi perpetual on spot gold. Tracks XAU/USD but settles in USDT and pays funding, so it can drift from the metal.';
+        marketCap = 'Perpetual Contract';
+        sector = 'Precious Metals';
+      } else if (isPaxg) {
+        name = 'PAX Gold (PAXG / USDT)';
+        description = 'Paxos Gold (PAXG) is an ERC-20 token backed 1:1 by one fine troy ounce of physical gold stored in Brink’s vaults in London.';
+        marketCap = '$650M Physical Gold';
+        sector = 'Precious Metals';
+      } else {
+        name = `${normSym.replace('USDT', '')} / USDT Spot`;
+        description = 'Real-time Binance 24/7 spot market feed streaming live klines, 100ms Level 2 order book depth, and trade tape.';
+        marketCap = normSym.includes('BTC') ? '$1.54T' : '$380B';
+        sector = 'Crypto Spot';
+      }
+
       setCompanyDetails({
         symbol: normSym,
-        name: isGold ? 'Gold (PAX Gold / USDT)' : `${normSym.replace('USDT', '')} / USDT Spot`,
-        description: isGold 
-          ? 'Paxos Gold (PAXG) is an ERC-20 token backed 1:1 by one fine troy ounce of physical gold stored in Brink’s vaults in London.' 
-          : `Real-time Binance 24/7 spot market feed streaming live klines, 100ms Level 2 order book depth, and trade tape.`,
-        marketCap: isGold ? '$650M Physical Gold' : normSym.includes('BTC') ? '$1.54T' : '$380B',
-        sector: isGold ? 'Precious Metals' : 'Crypto Spot',
-        exchange: 'Binance Global Spot',
+        name,
+        description,
+        marketCap,
+        sector,
+        exchange: isFut ? 'Binance USDS-M Futures' : 'Binance Global Spot',
         currency: 'USDT'
       });
     } catch (err) {

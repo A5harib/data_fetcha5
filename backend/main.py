@@ -140,13 +140,19 @@ class SymbolSession:
 
 class StreamManager:
     def __init__(self):
-        self.predictor = ReversalPredictor()
+        # One predictor per symbol: each loads its own model + scaler.
+        self.predictors: Dict[str, ReversalPredictor] = {}
         self.sessions: Dict[str, SymbolSession] = {}
+
+    def _predictor_for(self, sym: str) -> ReversalPredictor:
+        if sym not in self.predictors:
+            self.predictors[sym] = ReversalPredictor(symbol=sym)
+        return self.predictors[sym]
 
     async def get_or_create_session(self, symbol: str) -> SymbolSession:
         sym = symbol.upper()
         if sym not in self.sessions:
-            session = SymbolSession(symbol=sym, predictor=self.predictor)
+            session = SymbolSession(symbol=sym, predictor=self._predictor_for(sym))
             await session.start()
             self.sessions[sym] = session
         return self.sessions[sym]
