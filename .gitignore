@@ -25,3 +25,7 @@ dist-ssr
 Lib
 backend\.venv\Lib
 backend\.venv\Lib\
+.vercel
+.env*
+__pycache__/
+*.pyc

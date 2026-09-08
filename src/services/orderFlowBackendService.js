@@ -4,10 +4,10 @@
 
 export function connectOrderFlowAnalytics(symbol = 'BTCUSDT', onData, onError) {
   const cleanSymbol = symbol.toUpperCase().replace('-', '').replace('/', '');
-  // ponytail: same-origin in prod (vercel.json rewrites /ws to the backend service), localhost in dev
-  const host = import.meta.env.DEV ? 'localhost:8000' : window.location.host;
-  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws';
-  const wsUrl = `${proto}://${host}/ws/analytics/${cleanSymbol}`;
+  // Backend runs off-Vercel (websockets + a writable disk for retraining), so
+  // dial it directly. Vercel rewrites cannot proxy a websocket upgrade.
+  const base = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000';
+  const wsUrl = `${base.replace(/^http/, 'ws').replace(/\/$/, '')}/ws/analytics/${cleanSymbol}`;
   
   let ws = null;
   let isClosedManually = false;

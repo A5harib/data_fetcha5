@@ -204,7 +204,11 @@ async def health_check():
     return {
         "status": "online",
         "active_symbols": list(stream_manager.sessions.keys()),
-        "model_loaded": stream_manager.predictor.model is not None
+        # predictors is per-symbol and filled lazily, so an empty dict on a cold
+        # start is healthy, not a failure.
+        "models_loaded": {
+            sym: p.model is not None for sym, p in stream_manager.predictors.items()
+        },
     }
 
 

@@ -1,11 +1,15 @@
 """
 Configuration and constants for Quantitative Order Flow & ML Backend.
 """
+import os
 from pydantic import BaseModel
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent
-MODEL_DIR = BASE_DIR / "models"
+# Retraining writes models back at runtime, so this must point at a writable,
+# persistent path in deployment (HF Spaces mounts one at /data). Falls back to
+# the in-repo dir for local dev.
+MODEL_DIR = Path(os.environ.get("MODEL_DIR", BASE_DIR / "models"))
 MODEL_DIR.mkdir(exist_ok=True, parents=True)
 
 class Settings(BaseModel):
