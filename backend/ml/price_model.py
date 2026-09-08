@@ -92,6 +92,14 @@ class OnlinePriceModel:
         self.last_train_rows = 0
         # Residual spread from the most recent fit, used for the prediction band.
         self.resid_std: float = 0.0
+        # Out-of-sample shrinkage factor, refit each time on a holdout slice.
+        # Raw predictions overshoot badly: their spread is ~6x the spread of
+        # the returns they predict, so unshrunk output loses to a random walk
+        # on MAE even when the direction is right. beta is the slope of actual
+        # on predicted, measured out of sample; beta <= 0 means the signal is
+        # worthless or inverted this window and the model outputs a flat 0,
+        # which is exactly the random-walk forecast.
+        self.beta: float = 0.0
 
     def add_bar(self, bar: dict) -> bool:
         """
@@ -126,17 +134,34 @@ class OnlinePriceModel:
         X = d[FEATURE_NAMES_V3].values
         y = d["_y"].values
 
+        # Hold out the most recent slice to measure shrinkage out of sample.
+        # Fitting beta on the training rows would read back the overfit and
+        # give a confidently wrong scale.
+        cut = int(len(X) * 0.8)
+        if cut < 100 or len(X) - cut < 50:
+            return False
+
         # Recency weighting: the newest bar counts ~3x the oldest in the window.
-        w = np.linspace(1.0, 3.0, len(X))
+        w = np.linspace(1.0, 3.0, cut)
 
         m = xgb.XGBRegressor(**PARAMS)
-        m.fit(X, y, sample_weight=w)
+        m.fit(X[:cut], y[:cut], sample_weight=w)
+
+        p_hold = m.predict(X[cut:])
+        y_hold = y[cut:]
+        if p_hold.std() > 1e-12:
+            beta = float(np.polyfit(p_hold, y_hold, 1)[0])
+        else:
+            beta = 0.0
+        # Clamp: beta > 1 would mean amplifying, which never survives out of
+        # sample here. Negative beta means no usable signal -> predict no change.
+        self.beta = float(np.clip(beta, 0.0, 1.0))
 
         self.model = m
         self.n_fits += 1
-        self.last_train_rows = len(X)
+        self.last_train_rows = cut
         self.bars_since_fit = 0
-        self.resid_std = float(np.std(y - m.predict(X)))
+        self.resid_std = float(np.std(y_hold - p_hold * self.beta))
         return True
 
     def predict_next(self) -> Optional[dict]:
@@ -155,13 +180,19 @@ class OnlinePriceModel:
         if row.isna().any().any():
             return None
 
-        pred_ret = float(self.model.predict(row.values.astype(np.float32))[0])
+        raw_ret = float(self.model.predict(row.values.astype(np.float32))[0])
+        # Shrink toward zero by the out-of-sample slope. beta == 0 collapses
+        # the forecast to "no change", which is the honest answer when the
+        # window carries no signal.
+        pred_ret = raw_ret * self.beta
         last_close = float(d["close"].iloc[-1])
         return {
             "symbol": self.symbol,
             "from_open_time": int(d["open_time"].iloc[-1]),
             "last_close": last_close,
             "predicted_return_pct": pred_ret,
+            "raw_return_pct": raw_ret,
+            "beta": self.beta,
             "predicted_price": last_close * (1.0 + pred_ret / 100.0),
             "horizon_bars": self.horizon,
             "band_pct": self.resid_std,
@@ -201,6 +232,10 @@ def demo():
     assert abs(p["predicted_price"] - exp) < 1e-9, "price reconstruction wrong"
     # On random-walk input the model must not claim a large edge.
     assert abs(p["predicted_return_pct"]) < 5.0, p
+    # Shrinkage must be in range, and a zero beta must collapse to no change.
+    assert 0.0 <= p["beta"] <= 1.0, p
+    if p["beta"] == 0.0:
+        assert p["predicted_price"] == p["last_close"], p
 
     print(f"price_model demo OK (fits={m.n_fits}, window={len(m.bars)}, "
           f"pred={p['predicted_price']:.2f} vs last={p['last_close']:.2f})")

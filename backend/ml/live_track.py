@@ -108,6 +108,8 @@ class Scorer:
             "actual_ret": (actual / base - 1.0) * 100.0,
             "naive_err": abs(actual - base),
             "model_err": abs(actual - pred["predicted_price"]),
+            "beta": pred.get("beta", 0.0),
+            "raw_ret": pred.get("raw_return_pct", 0.0),
         }
         # Directional hit only counts when the model committed to a direction.
         row["dir_ok"] = (np.sign(row["pred_ret"]) == np.sign(row["actual_ret"])
@@ -141,7 +143,7 @@ def print_row(sym: str, r: dict, n: int):
     better = "model" if r["model_err"] < r["naive_err"] else "naive"
     print(f"[{n:>4}] {sym}  pred {r['predicted']:>12,.2f}  actual {r['actual']:>12,.2f}  "
           f"err {r['model_err']:>8.2f}  naive {r['naive_err']:>8.2f}  "
-          f"{hit}({r['pred_ret']:+.3f}% vs {r['actual_ret']:+.3f}%)  {better}")
+          f"{hit}({r['pred_ret']:+.3f}% vs {r['actual_ret']:+.3f}%)  b={r['beta']:.2f}  {better}")
 
 
 def print_summary(sym: str, s: dict, model: OnlinePriceModel):
@@ -149,7 +151,8 @@ def print_summary(sym: str, s: dict, model: OnlinePriceModel):
         print("no resolved predictions yet")
         return
     print("\n" + "=" * 78)
-    print(f"{sym}  n={s['n']}  refits={model.n_fits}  train_rows={model.last_train_rows}")
+    print(f"{sym}  n={s['n']}  refits={model.n_fits}  train_rows={model.last_train_rows}  "
+          f"beta={model.beta:.3f}")
     print("=" * 78)
     print(f"  model MAE   {s['model_mae']:>10.2f}   ({s['model_mae_bps']:.2f} bps)")
     print(f"  naive MAE   {s['naive_mae']:>10.2f}   ({s['naive_mae_bps']:.2f} bps)")
