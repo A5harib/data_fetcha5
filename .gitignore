@@ -29,3 +29,6 @@ backend\.venv\Lib\
 .env*
 __pycache__/
 *.pyc
+
+# Recorded live market data: regenerate with ml/record_live.py
+backend/data/*_1m_live.jsonl

@@ -44,11 +44,16 @@ class Settings(BaseModel):
     # 0.4% was the old global value; BTC's 99th-percentile 3-bar forward move is
     # ~0.40% and gold's is ~0.20%, so a shared 0.4% labels almost nothing.
     # These are set near each symbol's ~95th percentile instead.
+    # Tuned by grid search over (gate, threshold) on purged walk-forward folds.
+    # Raising the move a reversal must make, while lowering the gate so far more
+    # rows qualify, beat the old pair badly: BTC 0.639 -> 0.764 AUC, XAU
+    # 0.661 -> 0.740. The old settings starved the model (638 training rows on
+    # BTC fold 0); these give it ~16.6k rows.
     REVERSAL_THRESHOLD_PCT: dict[str, float] = {
-        "BTCUSDT": 0.15,
-        "XAUUSDT": 0.08,
+        "BTCUSDT": 0.20,
+        "XAUUSDT": 0.12,
     }
-    DEFAULT_REVERSAL_THRESHOLD_PCT: float = 0.15
+    DEFAULT_REVERSAL_THRESHOLD_PCT: float = 0.20
 
     def reversal_threshold_for(self, symbol: str) -> float:
         return self.REVERSAL_THRESHOLD_PCT.get(symbol.upper(), self.DEFAULT_REVERSAL_THRESHOLD_PCT)
@@ -59,10 +64,10 @@ class Settings(BaseModel):
     # instead of predicting the future. Gold's 3-bar move is ~3x smaller than
     # BTC's, so a shared 0.2% left only 288 usable gold rows out of 36k.
     GATE_PAST_RETURN_PCT: dict[str, float] = {
-        "BTCUSDT": 0.20,
-        "XAUUSDT": 0.08,
+        "BTCUSDT": 0.05,
+        "XAUUSDT": 0.05,
     }
-    DEFAULT_GATE_PAST_RETURN_PCT: float = 0.20
+    DEFAULT_GATE_PAST_RETURN_PCT: float = 0.05
 
     def gate_for(self, symbol: str) -> float:
         return self.GATE_PAST_RETURN_PCT.get(symbol.upper(), self.DEFAULT_GATE_PAST_RETURN_PCT)
