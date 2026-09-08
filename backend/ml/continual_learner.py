@@ -225,6 +225,13 @@ class ContinualLearningEngine:
 
         clf.fit(X_scaled, y_combined, sample_weight=recency_weights)
 
+        # ponytail: this retrains the v2 artifacts only. When a v3 model exists,
+        # main.py serves v3 and these writes are inert -- v3 uses different
+        # features, a different label gate, and a calibrated threshold, none of
+        # which this loop knows how to reproduce. Online updating of v3 needs
+        # the gate filter plus refitting the isotonic calibrator, so it is left
+        # off rather than silently drifting the served model. Wire it up when
+        # live labels have accumulated enough to justify it.
         # Save to this symbol's own artifacts, not the shared legacy pair, so
         # retraining one symbol cannot overwrite another's model.
         clf.save_model(str(settings.model_path_for(symbol)))

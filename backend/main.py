@@ -21,6 +21,7 @@ from engine.binance_stream import BinanceFuturesStreamConsumer
 from engine.orderflow_buffer import Candle, OrderFlowBuffer
 from ml.continual_learner import ContinualLearningEngine
 from ml.predictor import ReversalPredictor
+from ml.predictor_v3 import ReversalPredictorV3
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(name)s: %(message)s")
 logger = logging.getLogger("server")
@@ -34,6 +35,10 @@ class SymbolSession:
         self.consumer = BinanceFuturesStreamConsumer(symbol=self.symbol, buffer=self.buffer)
         self.analytics = OrderFlowAnalytics(buffer=self.buffer)
         self.predictor = predictor
+        # v3 serving path. Builds features with the same code the trainer uses
+        # and returns a calibrated probability, or None when the bar is not a
+        # reversal setup at all. Falls back to v2 if no v3 artifact is present.
+        self.predictor_v3 = ReversalPredictorV3(symbol=self.symbol)
         
         # Continual Online Learning Engine
         self.continual_learner = ContinualLearningEngine(
@@ -86,11 +91,19 @@ class SymbolSession:
         indicators = self.analytics.calculate_indicators()
         div_result = self.analytics.detect_divergence()
         
-        # ML Inference
-        prediction = self.predictor.predict(
-            indicator_dict=indicators,
-            active_factors=div_result.factors
-        )
+        # ML Inference. Prefer v3: it is scored only on bars that are genuine
+        # reversal setups, and its probability is isotonic-calibrated, so the
+        # number means what it says. v2 stays as the fallback.
+        if self.predictor_v3.model is not None:
+            prediction = self.predictor_v3.predict_from_candles(
+                self.buffer.get_recent_candles(n=300),
+                extra_factors=div_result.factors,
+            )
+        else:
+            prediction = self.predictor.predict(
+                indicator_dict=indicators,
+                active_factors=div_result.factors
+            )
 
         current_price = self.buffer.last_price
         if current_price == 0.0 and self.buffer.current_candle:
@@ -102,9 +115,16 @@ class SymbolSession:
             "cvd_1m": round(self.buffer.cvd_1m, 2),
             "orderbook_imbalance_pct": round(self.buffer.orderbook_imbalance_pct, 1),
             "reversal_prediction": {
-                "probability": prediction["probability"],
+                # None while warming up or when the bar is not a setup. The UI
+                # should show "no setup" rather than a fabricated 0.5.
+                "probability": prediction.get("probability"),
                 "signal": prediction["signal"],
-                "factors": prediction["factors"]
+                "factors": prediction.get("factors", []),
+                "in_setup": prediction.get("in_setup", True),
+                "fired": prediction.get("fired", False),
+                "threshold": prediction.get("threshold"),
+                "direction": prediction.get("direction"),
+                "model_version": "v3" if self.predictor_v3.model is not None else "v2",
             }
         }
         return payload

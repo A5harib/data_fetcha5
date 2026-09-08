@@ -52,6 +52,20 @@ class Settings(BaseModel):
 
     def reversal_threshold_for(self, symbol: str) -> float:
         return self.REVERSAL_THRESHOLD_PCT.get(symbol.upper(), self.DEFAULT_REVERSAL_THRESHOLD_PCT)
+
+    # Minimum prior 3-bar move that makes a bar a reversal candidate. Only these
+    # rows are trained and scored on: the rest can never host a reversal, and
+    # including them let the model score AUC 0.96 by re-detecting the past move
+    # instead of predicting the future. Gold's 3-bar move is ~3x smaller than
+    # BTC's, so a shared 0.2% left only 288 usable gold rows out of 36k.
+    GATE_PAST_RETURN_PCT: dict[str, float] = {
+        "BTCUSDT": 0.20,
+        "XAUUSDT": 0.08,
+    }
+    DEFAULT_GATE_PAST_RETURN_PCT: float = 0.20
+
+    def gate_for(self, symbol: str) -> float:
+        return self.GATE_PAST_RETURN_PCT.get(symbol.upper(), self.DEFAULT_GATE_PAST_RETURN_PCT)
     FEATURE_NAMES: list[str] = [
         "cvd_1m_delta",
         "cvd_5m_delta",
