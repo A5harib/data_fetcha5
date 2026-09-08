@@ -67,9 +67,27 @@ PARAMS = dict(
 
 
 def load_local_klines(symbol: str) -> pd.DataFrame:
+    """
+    Prefer bars recorded from the live API over the frozen JSON snapshot.
+
+    data/<SYM>_1m_live.jsonl is written by ml/record_live.py and keeps growing;
+    data/<SYM>_1m.json is a fixed dump from 2026-09-04. Training on the stale
+    file while serving today's tape is how the deployed model ended up with a
+    threshold it could never reach.
+    """
+    live = DATA_DIR / f"{symbol.upper()}_1m_live.jsonl"
+    if live.exists():
+        rows = [json.loads(l) for l in live.read_text(encoding="utf-8").splitlines() if l.strip()]
+        if len(rows) >= 5000:
+            df = (pd.DataFrame(rows).drop_duplicates(subset="open_time")
+                  .sort_values("open_time").reset_index(drop=True))
+            logger.info(f"{symbol}: using {len(df)} recorded live bars")
+            return df
+
     path = DATA_DIR / f"{symbol.upper()}_1m.json"
     if not path.exists():
-        raise FileNotFoundError(f"No local data for {symbol}. Run: python download_data.py")
+        raise FileNotFoundError(
+            f"No data for {symbol}. Run: python ml/record_live.py {symbol} --backfill 60000")
     raw = json.loads(path.read_text())
     rec = []
     for k in raw:
@@ -207,12 +225,33 @@ def fit_final(symbol: str):
                             gate_pct=settings.gate_for(symbol))
     X, y = X.values, y.values
 
-    clf, iso, _, _, thr = _fit_one(X, y, X[-10:], y[-10:])
+    # Fit on everything but the newest slice, then pick the threshold from the
+    # DEPLOYED model's own output on that held-out slice. Taking the threshold
+    # from _fit_one's internal validation split instead produced a cutoff the
+    # shipped model could never reach: its calibrated probabilities topped out
+    # at 0.247 against a 0.250 threshold, so the served model fired zero times
+    # in 3700 bars.
+    hold = max(500, int(len(X) * 0.15))
+    clf, iso, _, _, _ = _fit_one(X[:-hold], y[:-hold], X[-hold:], y[-hold:])
+
+    p_hold = iso.predict(clf.predict_proba(X[-hold:])[:, 1])
+    thr = _pick_threshold(y[-hold:], p_hold)
+    n_fire = int((p_hold >= thr).sum())
+    if n_fire == 0:
+        # Never ship a model that cannot speak. Fall back to the 95th
+        # percentile of its own output so it fires on its strongest ~5%.
+        thr = float(np.percentile(p_hold, 95))
+        n_fire = int((p_hold >= thr).sum())
+        logger.warning(f"{symbol}: target precision unreachable, using p95 cutoff")
+    prec = float(y[-hold:][p_hold >= thr].mean()) if n_fire else float("nan")
+    logger.info(f"{symbol}: threshold {thr:.3f} fires on {n_fire}/{hold} "
+                f"held-out rows, precision {prec:.3f} (base {y[-hold:].mean():.3f})")
 
     mp = MODEL_DIR / f"xgb_v3_{symbol.upper()}.json"
     cp = MODEL_DIR / f"calib_v3_{symbol.upper()}.joblib"
     clf.save_model(str(mp))
-    joblib.dump({"isotonic": iso, "threshold": thr, "features": FEATURE_NAMES_V3}, str(cp))
+    joblib.dump({"isotonic": iso, "threshold": thr, "features": FEATURE_NAMES_V3,
+                 "holdout_precision": prec, "holdout_base": float(y[-hold:].mean())}, str(cp))
     logger.info(f"{symbol}: saved {mp.name} + {cp.name} (threshold {thr:.3f})")
     return mp, cp, thr
 

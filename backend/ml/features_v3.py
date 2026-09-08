@@ -35,33 +35,38 @@ import pandas as pd
 # Feature order is the contract between training and serving. Changing it
 # invalidates every saved model.
 FEATURE_NAMES_V3 = [
-    # Volatility state. realized_vol_15m is the single strongest feature on both
-    # symbols by leave-one-out ablation (+0.013 AUC BTC, +0.027 XAU).
+    # Volatility state. realized_vol_15m is the strongest single feature.
     "realized_vol_15m",
     "vol_ratio_60m",
     "range_atr_ratio",
     "volume_z",
     # Bar shape: where price closed inside its range. Rejection wicks are the
-    # classic reversal tell and ablate positively on BTC.
+    # classic reversal tell.
     "body_frac",
     "upper_wick_frac",
     "lower_wick_frac",
     # Order flow against price.
     "cvd_price_divergence",
     "cvd_5m_z",
+    "cvd_1m_z",
     # Location and momentum.
     "vwap_distance_pct",
+    "vwap_dist_z",
     "rsi_14",
+    "price_change_pct",
+    "ret_5m_pct",
+    "ret_15m_pct",
     "minute_cos",
 ]
 
-# Dropped after leave-one-out ablation on purged walk-forward folds: cvd_1m_z,
-# price_change_pct, ret_5m_pct, ret_15m_pct, vwap_dist_z, minute_sin. Each
-# scored a NEGATIVE contribution on both symbols -- removing them raised AUC.
-# On ~1.6k BTC rows the model cannot afford features that only add variance.
+# minute_sin is the only candidate that still hurts (-0.0045 on 21k rows).
+# The five others once dropped here were readmitted: on the original 1.6k-row
+# dataset they added variance and scored negative, but with 21k rows from the
+# retuned gate every one of them contributes (+0.007 to +0.010 AUC each).
+# The lesson is that the earlier ablation was measuring sample size, not the
+# features -- re-run it whenever the row count changes materially.
 DROPPED_V3 = [
-    "cvd_1m_z", "price_change_pct", "ret_5m_pct",
-    "ret_15m_pct", "vwap_dist_z", "minute_sin",
+    "minute_sin",
 ]
 
 # Gate: only bars following a meaningful 3-bar move can host a reversal.
