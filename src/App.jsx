@@ -3,6 +3,7 @@ import TerminalHeader from './components/Navigation/TerminalHeader';
 import TradingViewChart from './components/Chart/TradingViewChart';
 import Watchlist from './components/Watchlist/Watchlist';
 import RealMarketFeed from './components/MarketData/RealMarketFeed';
+import ReversalPanel from './components/ML/ReversalPanel';
 import CompanyInfo from './components/CompanyInfo/CompanyInfo';
 import {
   fetchBinanceKlines,
@@ -276,7 +277,9 @@ export default function App() {
         </div>
 
         {/* Right: Binance Pro Level 2 Order Book & Market Trades */}
-        <RealMarketFeed
+        <div className="flex flex-col min-h-0">
+          <ReversalPanel symbol={normalizeBinanceSymbol(activeSymbol)} />
+          <RealMarketFeed
           symbol={normalizeBinanceSymbol(activeSymbol)}
           currentPrice={currentPrice}
           priceChange={priceChange}
@@ -288,8 +291,9 @@ export default function App() {
           portfolioCash={portfolioCash}
           positions={positions}
           onExecuteOrder={handleExecuteOrder}
-          onClosePosition={handleClosePosition}
-        />
+            onClosePosition={handleClosePosition}
+          />
+        </div>
       </div>
     </div>
   );
