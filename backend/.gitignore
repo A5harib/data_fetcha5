@@ -2,3 +2,7 @@ __pycache__/
 *.pyc
 .venv/
 *.log
+
+# Forecaster archive cache and assembled history: regenerate with forecast/data.py
+data/raw/
+data/*_1m_hist.pkl

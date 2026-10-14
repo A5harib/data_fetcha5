@@ -43,9 +43,10 @@ except ImportError:
 _seed = Path(__file__).resolve().parent / "models"
 _target = Path(os.environ["MODEL_DIR"])
 _target.mkdir(parents=True, exist_ok=True)
-for f in _seed.glob("*"):
-    dest = _target / f.name
+for f in _seed.rglob("*"):
+    dest = _target / f.relative_to(_seed)
     if f.is_file() and not dest.exists():
+        dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(f.read_bytes())
 
 with gr.Blocks(title="a5stocks backend") as demo:
@@ -57,6 +58,7 @@ with gr.Blocks(title="a5stocks backend") as demo:
         "- `GET /health`\n"
         "- `GET /api/analytics/{symbol}`\n"
         "- `WS  /ws/analytics/{symbol}`\n"
+        "- `GET /api/forecast/{symbol}?horizon=60`\n"
         "- `GET /docs`"
     )
 

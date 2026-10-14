@@ -3,7 +3,7 @@ import TerminalHeader from './components/Navigation/TerminalHeader';
 import TradingViewChart from './components/Chart/TradingViewChart';
 import Watchlist from './components/Watchlist/Watchlist';
 import RealMarketFeed from './components/MarketData/RealMarketFeed';
-import ReversalPanel from './components/ML/ReversalPanel';
+import ForecastPanel from './components/ML/ForecastPanel';
 import CompanyInfo from './components/CompanyInfo/CompanyInfo';
 import {
   fetchBinanceKlines,
@@ -278,7 +278,7 @@ export default function App() {
 
         {/* Right: Binance Pro Level 2 Order Book & Market Trades */}
         <div className="flex flex-col min-h-0">
-          <ReversalPanel symbol={normalizeBinanceSymbol(activeSymbol)} />
+          <ForecastPanel key={normalizeBinanceSymbol(activeSymbol)} symbol={normalizeBinanceSymbol(activeSymbol)} currentPrice={currentPrice} />
           <RealMarketFeed
           symbol={normalizeBinanceSymbol(activeSymbol)}
           currentPrice={currentPrice}
