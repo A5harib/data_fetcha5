@@ -1,0 +1,14 @@
+[Unit]
+Description=BTC paper-trading bot (fake money, live Binance prices)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=__USER__
+WorkingDirectory=__APP__/backend
+ExecStart=__APP__/.venv/bin/python -u -m forecast.paper --symbol BTCUSDT
+Restart=always
+RestartSec=30
+
+[Install]
+WantedBy=multi-user.target

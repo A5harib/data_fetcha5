@@ -36,6 +36,11 @@ DATA_DIR = Path(__file__).resolve().parent.parent / "data"
 RAW_DIR = DATA_DIR / "raw"
 ARCHIVE = "https://data.binance.vision/data/futures/um"
 REST = "https://fapi.binance.com"
+# Binance's public spot market-data host. Unlike fapi it answers from US
+# servers (fapi returns HTTP 451 there), so a bot on a US host can use it.
+SPOT = "https://data-api.binance.vision"
+# No XAU on Binance spot: PAXG is a token backed by one ounce of gold.
+SPOT_SYMBOL = {"XAUUSDT": "PAXGUSDT"}
 
 KLINE_COLS = ["open_time", "open", "high", "low", "close", "volume", "close_time",
               "quote_volume", "count", "taker_buy_volume", "taker_buy_quote_volume", "ignore"]
@@ -125,17 +130,17 @@ def fetch_funding(symbol: str, start_ms: int, end_ms: int | None = None) -> pd.D
         cursor = batch[-1]["fundingTime"] + 1
     df = pd.DataFrame(rows)
     if df.empty:
-        return pd.DataFrame(columns=["t", "funding"])
+        return pd.DataFrame({"t": pd.Series(dtype="int64"), "funding": pd.Series(dtype=float)})
     return pd.DataFrame({"t": df["fundingTime"].astype("int64"), "funding": df["fundingRate"].astype(float)})
 
 
 # ---------------------------------------------------------------- live
 
-def _rest_klines(path: str, symbol: str, n: int) -> pd.DataFrame:
-    """Last n 1m bars, paging backwards. REST caps one page at 1500."""
+def _rest_klines(path: str, symbol: str, n: int, base: str = REST, page_max: int = 1500) -> pd.DataFrame:
+    """Last n 1m bars, paging backwards. Futures REST caps a page at 1500, spot at 1000."""
     pages, end = [], None
     while n > 0:
-        url = f"{REST}{path}?symbol={symbol}&interval=1m&limit={min(n, 1500)}"
+        url = f"{base}{path}?symbol={symbol}&interval=1m&limit={min(n, page_max)}"
         if end is not None:
             url += f"&endTime={end}"
         page = json.loads(_get(url))
@@ -162,6 +167,59 @@ def fetch_recent(symbol: str, minutes: int = 4000) -> pd.DataFrame:
     fu = fetch_funding(symbol, start)
     kl = kl[kl["close_time"].astype("int64") < t_req]
     return assemble(kl, pr, fu)
+
+
+class LiveFeed:
+    """
+    fetch_recent() for a loop that runs every minute: downloads the full window
+    once, then only the newest few bars. Same output as fetch_recent, about
+    1/400th of the traffic. Refetches everything after a gap (sleep, outage).
+    """
+
+    def __init__(self, symbol: str, minutes: int = 4000, source: str = "futures"):
+        self.symbol, self.minutes, self.source = symbol, minutes, source
+        self.kl = None
+
+    def _klines(self, n: int):
+        if self.source == "spot":
+            return _rest_klines("/api/v3/klines", SPOT_SYMBOL.get(self.symbol, self.symbol), n, SPOT, 1000)
+        return _rest_klines("/fapi/v1/klines", self.symbol, n)
+
+    def _premium(self, n: int):
+        if self.source == "spot":
+            # Spot has no perp basis. Zero premium only feeds the range model;
+            # the up/down call uses price and volume features alone.
+            p = self.kl.copy()
+            p["close"] = 0.0
+            return p
+        return _rest_klines("/fapi/v1/premiumIndexKlines", self.symbol, n)
+
+    def _funding(self, start_ms: int):
+        if self.source == "spot":
+            return pd.DataFrame({"t": [0], "funding": [0.0]})
+        return fetch_funding(self.symbol, start_ms)
+
+    def _merge(self, old: pd.DataFrame, new: pd.DataFrame) -> pd.DataFrame:
+        # The last bar of the previous fetch may have been open; keep the newer copy.
+        both = pd.concat([old, new], ignore_index=True)
+        both["open_time"] = pd.to_numeric(both["open_time"]).astype("int64")
+        both = both.drop_duplicates("open_time", keep="last").sort_values("open_time")
+        return both.tail(self.minutes + 2).reset_index(drop=True)
+
+    def get(self) -> pd.DataFrame:
+        t_req = int(time.time() * 1000)
+        stale = self.kl is None or t_req - int(self.kl["open_time"].iloc[-1]) > 10 * 60_000
+        if stale:
+            self.kl = self._klines(self.minutes + 1)
+            self.pr = self._premium(self.minutes + 1)
+            self.fu = self._funding(int(self.kl["open_time"].iloc[0]) - 9 * 3600_000)
+        else:
+            self.kl = self._merge(self.kl, self._klines(5))
+            self.pr = self._merge(self.pr, self._premium(5))
+            last = int(self.fu["t"].max()) if len(self.fu) else int(self.kl["open_time"].iloc[0])
+            self.fu = pd.concat([self.fu, self._funding(last + 1)], ignore_index=True).drop_duplicates("t")
+        kl = self.kl[pd.to_numeric(self.kl["close_time"]).astype("int64") < t_req]
+        return assemble(kl, self.pr, self.fu)
 
 
 # ---------------------------------------------------------------- assemble

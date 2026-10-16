@@ -6,3 +6,6 @@ __pycache__/
 # Forecaster archive cache and assembled history: regenerate with forecast/data.py
 data/raw/
 data/*_1m_hist.pkl
+
+# Paper-trading run state and logs: forecast/paper.py
+data/paper/

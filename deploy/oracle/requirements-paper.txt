@@ -1,0 +1,6 @@
+# Only what forecast/paper.py needs. Versions match the ones the models were trained with.
+numpy==2.4.6
+pandas==3.0.5
+scipy==1.18.1
+xgboost==3.4.1
+fastapi==0.141.1

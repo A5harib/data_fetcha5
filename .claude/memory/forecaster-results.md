@@ -19,10 +19,10 @@ Every number below comes from walk-forward testing on data the model never saw. 
 | Range model vs textbook (HAR) | Explains 44% of how big the next hour's move is, against 33% for HAR. Better in 16/16 quarters. |
 | 9-in-10 floor | Price ended above it 88-90% of the time, every quarter |
 
-## XAUUSDT, next 60 minutes (evaluated, not saved)
+## XAUUSDT, next 60 minutes (saved 2026-10-16)
 - **History:** about 10 months, since the 2025-12-11 listing. Folds used 3 months of training and 1-month tests, 7 folds in total.
 - **Range model:** explains 59% against 50% for HAR, and won 5 of 7 folds. It lost the first two, which had the least training data.
-- **Up/down:** the old tree model failed. The snap-back rule was never run on XAU before the pause. Note that the states study found nothing that holds for gold.
+- **Up/down (snap-back):** 2,798 calls, right 53.3% vs 50.3% always-up, better in 5/7 months, worst month 50.5%. Avg win +0.17%, avg loss -0.21%.
 
 ## The old xgboost up/down model (replaced)
 It was right 50.5% overall and 51.3% on its most confident 10%, which is a coin flip. Trees and ridge regression fit the *average* move, and that has no stable sign. See [[research-findings]].

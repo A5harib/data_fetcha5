@@ -32,10 +32,12 @@ Four research agents and my own tests ran on 2022-01 to 2026-10 Binance futures 
 - **Funding extremes, funding-settlement minutes, day-of-week and Monday open:** all about 49-51%.
 - **Gold:** nothing survived. With 10 months of data, there are too few samples.
 
-## Unfinished when paused
-- **Cross-asset features** (ETH and SOL lead or lag, relative strength, market-wide flow) for BTC direction: the agent was stopped before reporting. ETHUSDT and SOLUSDT histories are cached in backend/data.
-- **Positioning data** (open interest and long/short ratios from the data.binance.vision daily `metrics` files, 5-min resolution): the agent was stopped while downloading. The live REST equivalents only go back about 30 days.
-- **Strength tiers** (are stronger snap-back signals right more often?): the script was stopped. One agent saw 57.6% on the top 10% versus 56.6% on the top 20%, so expect only a small gain.
+## Finished 2026-10-16 (none fixes the money problem)
+- Cross-asset (ETH, SOL returns, flow, relative strength) added to or filtering the snap-back score: hit 54.5-55.6% vs 55.6% base, same win/loss shape. No gain.
+- Learned veto (xgb on earlier quarters' calls, nested walk-forward): skipping predicted big losses or low predicted payoff lifts avg per call from +0.8 to +1.5bp, 13/14 quarters positive, hit 55.8%. Still under the 4bp maker fee.
+- Limit-order entries 0.1-0.5 sigma beyond price, waiting 5-30 min: adverse selection. Fills happen when the move keeps running, avg per call drops to about -0.5bp.
+- Positioning (data.binance.vision daily metrics, 5-min OI and long/short ratios, cached in session scratchpad only): univariate ICs all within +/-0.03. As a filter on snap-back calls: "OI fell over last 240m" gives 56.7% right, +1.5bp, 14/16 quarters positive, on half the calls. "Crowd long/short ratio leans with the stretch" gives 56.1%. Small, not shipped; live REST history (~30 days) would be enough to compute it.
+- Verdict: the snap-back calls are right about 55-57% of the time but are worth roughly zero money per call. Every fix tried moved profit by at most 1bp against a 4-12bp cost.
 
 ## Near-misses worth tracking forward
 - **BTC weekend gap, continue the Fri 17:00 to Sun 18:00 NY move after the CME reopen:** 59.4% on n=197, 13/16 quarters, and +16bp per call (the only state whose average beat taker cost). It replicated on ETH (60.7%) and SOL (58.2%), but failed multiple-testing correction, and 2024 was 51.9%.
@@ -45,3 +47,11 @@ Four research agents and my own tests ran on 2022-01 to 2026-10 Binance futures 
 - Its `seconds_since_trade` feature measured PC clock skew.
 - It had only 88 minutes of data.
 - At a 30-second horizon the median move (2.7bp) is far below fees (10bp). Even a perfect forecast loses at that horizon.
+
+## RL trading agents (2026-10-16, numpy CEM/ES policies, long/flat/short)
+Trained 2022..2026-06, picked on 2026-07..09, tested once on 2026-10-01..13 and live 10-14..16, 6bp fee per side.
+- BTC 60m, trained at taker fees: learned to stay out ~99% of the time (+0.9% test from 1 trade, 0 live trades).
+- BTC 60m trained at 2bp and BTC 15m: picked because they rode the Jul-Sep bull run; test/live -5.8% to -4.2%. Long training runs hit +300% to +3800% in-sample and lost on unseen months (memorised).
+- Gold 15m: +20% on pick months, -2.7% on the honest test, +3.3% live from 2 trades (noise).
+- Verdict: RL adds nothing over the snap-back rule; best learned behaviour is sitting out.
+- Live forward test of the saved forecasters (2.6 days): BTC range 79%, 34 calls 62% right; gold range 81%, 40 calls 6 in 10 right. Both still below fees per call. Too few calls to judge.

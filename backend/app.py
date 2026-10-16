@@ -77,5 +77,19 @@ try:
 except Exception as exc:  # pragma: no cover
     print(f"gradio launch hook failed (continuing): {exc}")
 
+# Paper-trading bot, opt-in via PAPER_BOT so a local run of the backend never
+# starts a second trader. Not used on the HF Space: Binance blocks its US
+# region (HTTP 451), so the bots run elsewhere and the Space only shows their
+# results via PAPER_VIEW (see forecast/paper.py).
+if os.environ.get("PAPER_BOT"):
+    import logging
+    import threading
+
+    from forecast import paper
+
+    logging.basicConfig(level=logging.INFO)
+    for sym in ("BTCUSDT", "XAUUSDT"):
+        threading.Thread(target=paper.run, args=(sym, 60, 14, 100.0), daemon=True, name=f"paperbot-{sym}").start()
+
 # The Space proxies $PORT, so the API owns it.
 uvicorn.run(fastapi_app, host="0.0.0.0", port=int(os.environ.get("PORT", 7860)))

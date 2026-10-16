@@ -32,3 +32,6 @@ __pycache__/
 
 # Recorded live market data: regenerate with ml/record_live.py
 backend/data/*_1m_live.jsonl
+
+# Built by deploy/oracle/pack.py, holds live run state
+deploy/oracle/paperbot.zip

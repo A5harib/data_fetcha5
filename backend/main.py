@@ -19,6 +19,7 @@ from config import settings
 from engine.analytics import OrderFlowAnalytics
 from engine.binance_stream import BinanceFuturesStreamConsumer
 from engine.orderflow_buffer import Candle, OrderFlowBuffer
+from forecast.paper import router as paper_router
 from forecast.predictor import router as forecast_router
 from ml.continual_learner import ContinualLearningEngine
 from ml.predictor import ReversalPredictor
@@ -221,6 +222,7 @@ app.add_middleware(
 
 
 app.include_router(forecast_router)
+app.include_router(paper_router)
 
 
 @app.get("/health")
