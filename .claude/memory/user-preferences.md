@@ -11,3 +11,6 @@ metadata:
   - Always tell them when "right more often than wrong" still means "doesn't make money".
 - **Way of working.** They trust my judgement on design. They are happy for me to run many subagents in parallel, and reminded me twice. The machine has only 4 CPU cores, so heavy training jobs must not run side by side.
 - **Reporting back.** They asked to hear back only once the model actually works, not with every intermediate step.
+- **Hands-off running.** They want things to keep running without their PC on, and to be told when something needs attention rather than checking themselves. Hence the bots on the Space and the 6-hourly checker with phone pushes.
+- **Free first.** They tried free hosting (Oracle, then Hugging Face) before paying. Offer the free route and name the paid fallback (a Hetzner VPS at about €4/mo).
+- **Fake-money testing.** They like seeing the model "do something" with fake money, not only backtests. Report it as dollars and "right X of Y".

@@ -1,7 +1,9 @@
 # Memory index
 
-- [Forecaster status](forecaster-status.md) — what is built in backend/forecast, what is trained, how to run it, the live $100 paper-trading run (ends 2026-10-30)
-- [Forecaster results](forecaster-results.md) — out-of-sample numbers for the price range and up/down calls (BTC, XAU)
-- [Research findings](research-findings.md) — everything tried for up/down calls, what worked, what failed and why
-- [Next steps](next-steps.md) — unfinished work and ideas, in priority order
+- [Forecaster status](forecaster-status.md) — what is built in backend/forecast, files, commands, trained models, what is uncommitted
+- [Forecaster results](forecaster-results.md) — out-of-sample numbers for the price range and up/down calls (BTC, XAU), live forward test
+- [Research findings](research-findings.md) — everything tried for up/down calls (features, other coins, positioning, payoff fixes, RL), what held and what failed
+- [Paper bots](paper-bots.md) — the live $100 BTC and gold bots on the HF Space, how to check or restart them, the 6-hourly checker routine
+- [Gotchas](gotchas.md) — Binance geo-blocks, HF Space quirks, cloud routine network limits, pandas 3 and Windows traps, with fixes
+- [Next steps](next-steps.md) — open items in priority order
 - [Working with the user](user-preferences.md) — plain language only, the goal is mostly-correct calls for investing
