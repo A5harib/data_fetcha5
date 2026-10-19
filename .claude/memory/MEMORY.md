@@ -7,3 +7,4 @@
 - [Gotchas](gotchas.md) — Binance geo-blocks, HF Space quirks, cloud routine network limits, pandas 3 and Windows traps, with fixes
 - [Next steps](next-steps.md) — open items in priority order
 - [Working with the user](user-preferences.md) — plain language only, the goal is mostly-correct calls for investing
+- [Model 2](model2.md) — self-learning BTC and gold paper bots at /model2 on the Space, backtest, files, how to retrain

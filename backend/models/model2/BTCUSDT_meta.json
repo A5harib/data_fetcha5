@@ -1,0 +1,42 @@
+{
+  "symbol": "BTCUSDT",
+  "trained_through": "2026-10-18 23:59:00+00:00",
+  "backtest": {
+    "2022": {
+      "trades": 90,
+      "right": 0.556,
+      "hours_held": 3.19,
+      "per_100": 72.08,
+      "per_100_no_fees": 80.31
+    },
+    "2023": {
+      "trades": 195,
+      "right": 0.713,
+      "hours_held": 2.5,
+      "per_100": 95.52,
+      "per_100_no_fees": 120.71
+    },
+    "2024": {
+      "trades": 66,
+      "right": 0.561,
+      "hours_held": 2.69,
+      "per_100": 81.43,
+      "per_100_no_fees": 88.14
+    },
+    "2025": {
+      "trades": 258,
+      "right": 0.624,
+      "hours_held": 3.4,
+      "per_100": 96.75,
+      "per_100_no_fees": 131.87
+    },
+    "2026": {
+      "trades": 144,
+      "right": 0.715,
+      "hours_held": 2.57,
+      "per_100": 88.94,
+      "per_100_no_fees": 105.72
+    }
+  },
+  "hours_learned": 41324
+}

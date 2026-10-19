@@ -1,0 +1,42 @@
+{
+  "symbol": "XAUUSDT",
+  "trained_through": "2026-10-18 23:59:00+00:00",
+  "backtest": {
+    "2022": {
+      "trades": 96,
+      "right": 0.719,
+      "hours_held": 0.81,
+      "per_100": 100.98,
+      "per_100_no_fees": 113.32
+    },
+    "2023": {
+      "trades": 134,
+      "right": 0.746,
+      "hours_held": 0.67,
+      "per_100": 97.96,
+      "per_100_no_fees": 115.06
+    },
+    "2024": {
+      "trades": 823,
+      "right": 0.847,
+      "hours_held": 0.67,
+      "per_100": 96.93,
+      "per_100_no_fees": 260.3
+    },
+    "2025": {
+      "trades": 202,
+      "right": 0.757,
+      "hours_held": 0.77,
+      "per_100": 99.48,
+      "per_100_no_fees": 126.77
+    },
+    "2026": {
+      "trades": 38,
+      "right": 0.605,
+      "hours_held": 4.05,
+      "per_100": 94.99,
+      "per_100_no_fees": 99.43
+    }
+  },
+  "hours_learned": 31530
+}

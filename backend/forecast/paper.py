@@ -34,6 +34,12 @@ from forecast.predictor import Forecaster
 
 DIR = Path(__file__).resolve().parent.parent / "data" / "paper"
 FEE = 0.0006  # per side: Binance taker 0.05% plus a little slippage
+# Every symbol that gets a bot and a spot in the page header. Override with
+# PAPER_SYMBOLS="BTCUSDT,ETHUSDT". A symbol with no trained model is skipped.
+SYMBOLS = [s.strip().upper() for s in os.environ.get(
+    "PAPER_SYMBOLS", "BTCUSDT,XAUUSDT,ETHUSDT,SOLUSDT,BNBUSDT,XRPUSDT,DOGEUSDT").split(",") if s.strip()]
+NAMES = {"BTCUSDT": "BTC", "XAUUSDT": "Gold", "ETHUSDT": "ETH", "SOLUSDT": "SOL",
+         "BNBUSDT": "BNB", "XRPUSDT": "XRP", "DOGEUSDT": "DOGE"}
 log = logging.getLogger("forecast.paper")
 
 
@@ -171,7 +177,47 @@ def status(sym: str):
     print(f"last bar seen {st['last_bar']}")
 
 
+def _price(p: float) -> str:
+    # Cheap coins (XRP, DOGE) need more decimals than BTC.
+    return f"{p:,.1f}" if p >= 100 else f"{p:,.4f}"
+
+
+def _header(current: str) -> str:
+    """One chip per bot: name, balance, change since start. Links to its page."""
+    chips, total, start = [], 0.0, 0.0
+    for sym in SYMBOLS:
+        st = load(sym)
+        if st is None:
+            continue
+        total += st["cash"]
+        start += st["start_cash"]
+        chg = st["cash"] - st["start_cash"]
+        sel = " sel" if sym == current else ""
+        chips.append(f"<a class='chip{sel}' href='?symbol={sym}'><span>{NAMES.get(sym, sym)}</span>"
+                     f"<b>${st['cash']:.2f}</b><i class={'up' if chg >= 0 else 'dn'}>{chg:+.2f}</i></a>")
+    if not chips:
+        return ""
+    chg = total - start
+    chips.append(f"<span class='chip tot'><span>All bots</span><b>${total:.2f}</b>"
+                 f"<i class={'up' if chg >= 0 else 'dn'}>{chg:+.2f}</i></span>")
+    return f"<nav>{''.join(chips)}</nav>"
+
+
 router = APIRouter()
+
+
+@router.get("/api/paper")
+def paper_all():
+    """Balance summary of every bot, for the header or a quick check."""
+    out = {}
+    for sym in SYMBOLS:
+        st = load(sym)
+        if st:
+            tr = st["trades"]
+            out[sym] = {"cash": round(st["cash"], 2), "cash_no_fees": round(st["cash_no_fees"], 2),
+                        "trades": len(tr), "right": sum(t["right"] for t in tr),
+                        "open": st["position"] is not None, "last_bar": st["last_bar"]}
+    return out
 
 
 @router.get("/api/paper/{symbol}")
@@ -183,17 +229,17 @@ def paper_json(symbol: str):
 def paper_page(symbol: str = "BTCUSDT"):
     st = load(symbol.upper())
     if st is None:
-        return f"<p>No paper run for {symbol.upper()} yet. It starts when the Space boots.</p>"
+        return f"<p>No paper run for {symbol.upper()} yet. It starts when the Space boots.</p>{_header('')}"
     tr = st["trades"]
     right = sum(t["right"] for t in tr)
     pos = st["position"]
     rows = "".join(
         f"<tr><td>{t['entry_time'][5:16].replace('T', ' ')}</td><td>{'Long' if t['side'] > 0 else 'Short'}</td>"
-        f"<td>{t['entry']:,.1f}</td><td>{t['exit']:,.1f}</td>"
+        f"<td>{_price(t['entry'])}</td><td>{_price(t['exit'])}</td>"
         f"<td class={'up' if t['right'] else 'dn'}>{t['move_pct']:+.2f}%</td><td>${t['cash']:.2f}</td></tr>"
         for t in reversed(tr))
     now = datetime.now(timezone.utc)
-    open_line = (f"<p>Open now: <b>{'Long' if pos['side'] > 0 else 'Short'}</b> at {pos['entry']:,.1f}, "
+    open_line = (f"<p>Open now: <b>{'Long' if pos['side'] > 0 else 'Short'}</b> at {_price(pos['entry'])}, "
                  f"closes {pos['exit_bar'][11:16]} UTC</p>" if pos else "<p>No open trade. Waiting for a call.</p>")
     return f"""<!doctype html><html><head><meta charset=utf-8>
 <meta name=viewport content="width=device-width,initial-scale=1"><meta http-equiv=refresh content=60>
@@ -201,9 +247,14 @@ def paper_page(symbol: str = "BTCUSDT"):
 body{{font:15px system-ui,sans-serif;max-width:720px;margin:24px auto;padding:0 16px;background:#12161f;color:#eaecef}}
 table{{width:100%;border-collapse:collapse}}td,th{{padding:6px;border-bottom:1px solid #2b313a;text-align:right}}
 td:first-child,th:first-child{{text-align:left}}.up{{color:#0ecb81}}.dn{{color:#f6465d}}.big{{font-size:28px;font-weight:600}}
-small{{color:#848e9c}}</style></head><body>
-<p><a href="?symbol=BTCUSDT" style="color:#fcd535">BTC</a> &middot; <a href="?symbol=XAUUSDT" style="color:#fcd535">Gold</a></p>
-<h2>{symbol.upper()} paper bot</h2>
+small{{color:#848e9c}}
+nav{{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px}}
+.chip{{display:flex;flex-direction:column;padding:8px 12px;border:1px solid #2b313a;border-radius:8px;
+color:#eaecef;text-decoration:none;min-width:84px}}.chip span{{font-size:12px;color:#848e9c}}
+.chip i{{font-style:normal;font-size:12px}}.chip.sel{{border-color:#fcd535}}.chip.tot{{background:#1b2130}}
+</style></head><body>
+{_header(symbol.upper())}
+<h2>{NAMES.get(symbol.upper(), symbol.upper())} paper bot</h2>
 <div class=big>${st['cash']:.2f}</div>
 <small>started ${st['start_cash']:.2f} on {st['started'][:16].replace('T', ' ')} UTC, ends {st['ends'][:16].replace('T', ' ')} UTC.
 Without fees: ${st['cash_no_fees']:.2f}</small>

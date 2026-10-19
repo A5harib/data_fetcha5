@@ -77,19 +77,29 @@ try:
 except Exception as exc:  # pragma: no cover
     print(f"gradio launch hook failed (continuing): {exc}")
 
-# Paper-trading bot, opt-in via PAPER_BOT so a local run of the backend never
-# starts a second trader. Not used on the HF Space: Binance blocks its US
-# region (HTTP 451), so the bots run elsewhere and the Space only shows their
-# results via PAPER_VIEW (see forecast/paper.py).
+# Paper-trading bots, opt-in via PAPER_BOT so a local run of the backend never
+# starts a second trader. On the HF Space they read Binance spot prices
+# (PAPER_SOURCE=spot), because Binance futures blocks US servers.
 if os.environ.get("PAPER_BOT"):
     import logging
     import threading
 
     from forecast import paper
+    from forecast.train import MODEL_DIR
 
     logging.basicConfig(level=logging.INFO)
-    for sym in ("BTCUSDT", "XAUUSDT"):
+    for sym in paper.SYMBOLS:
+        if not (MODEL_DIR / f"{sym}_60m" / "meta.json").exists():
+            logging.warning(f"paper bot {sym} skipped: no trained 60m model")
+            continue
         threading.Thread(target=paper.run, args=(sym, 60, 14, 100.0), daemon=True, name=f"paperbot-{sym}").start()
+
+# Model 2: self-learning BTC and gold paper bots, shown at /model2. They start
+# under the same PAPER_BOT switch and keep their state under model2/ in
+# PAPER_DATASET, apart from model 1's files. See model2/agent.py.
+import model2  # noqa: E402
+
+model2.attach(fastapi_app)
 
 # The Space proxies $PORT, so the API owns it.
 uvicorn.run(fastapi_app, host="0.0.0.0", port=int(os.environ.get("PORT", 7860)))

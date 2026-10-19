@@ -29,6 +29,13 @@ The user asked why it bets everything. All-in makes the result read directly as 
 - **Viewing:** `/paper?symbol=BTCUSDT|XAUUSDT` is an HTML page refreshed every minute that shows the current UTC and Pakistan time. `/api/paper/{SYM}` returns JSON.
 - **Viewer-only mode:** `PAPER_VIEW=1` serves only the dataset's copy. Never set it together with `PAPER_BOT`, because its pull overwrites the live bot's trade file.
 
+## Seven coins (since 2026-10-19 16:25 UTC)
+- The user found the losses too big and asked for more coins. I warned that more coins multiply the fee losses, and they chose "same rule, more coins now".
+- New $100 bots on ETH, SOL, BNB, XRP and DOGE run for 14 days from 2026-10-19 16:25 UTC. Models were trained 2026-10-19. Walk-forward: right 54-55% on each, about 0 per call before fees, all spot-safe features.
+- The coin list is `SYMBOLS` in `paper.py`, overridable with the `PAPER_SYMBOLS` env var. `app.py` skips any coin with no trained model.
+- The `/paper` page header shows every bot's balance plus an "All bots" total. `GET /api/paper` returns a summary of all bots.
+- Not committed to git yet. The Space is ahead of GitHub again.
+
 ## Checking and fixing
 - **Stalled:** `last_bar` should be under 2 minutes old. If it is stale, restart the Space at https://huggingface.co/spaces/A5harib/a5stocks-backend. The balance resumes from the dataset.
 - **Logs:** `GET https://huggingface.co/api/spaces/A5harib/a5stocks-backend/logs/run` with the HF token (print with `PYTHONIOENCODING=utf-8`).
