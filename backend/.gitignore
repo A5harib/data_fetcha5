@@ -9,3 +9,7 @@ data/*_1m_hist.pkl
 
 # Paper-trading run state and logs: forecast/paper.py
 data/paper/
+data/model3_daily.pkl
+data/model3/
+data/model4/
+data/model4_check.json

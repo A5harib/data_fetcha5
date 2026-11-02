@@ -1,0 +1,67 @@
+{
+ "rule": {
+  "lookback": 20,
+  "trend_sma": 50,
+  "top_k": 2,
+  "vol_target": 0.4,
+  "sleeves": 7,
+  "fee": 0.001
+ },
+ "all": {
+  "start": "2022-06-01",
+  "end": "2026-10-27",
+  "per_100": 399.81,
+  "worst_drop_pct": -26.5,
+  "hold_all_per_100": 221.88,
+  "hold_btc_per_100": 271.46,
+  "fees_per_100": 23.84,
+  "years": {
+   "2022": {
+    "ret_pct": -7.4,
+    "worst_drop_pct": -18.8,
+    "months_up": "3/7"
+   },
+   "2023": {
+    "ret_pct": 60.6,
+    "worst_drop_pct": -26.5,
+    "months_up": "6/12"
+   },
+   "2024": {
+    "ret_pct": 95.1,
+    "worst_drop_pct": -23.1,
+    "months_up": "6/12"
+   },
+   "2025": {
+    "ret_pct": 54.2,
+    "worst_drop_pct": -13.7,
+    "months_up": "9/12"
+   },
+   "2026": {
+    "ret_pct": -10.6,
+    "worst_drop_pct": -22.7,
+    "months_up": "4/10"
+   }
+  }
+ },
+ "unseen": {
+  "start": "2025-01-01",
+  "end": "2026-10-27",
+  "per_100": 136.35,
+  "worst_drop_pct": -24.7,
+  "hold_all_per_100": 78.44,
+  "hold_btc_per_100": 85.54,
+  "fees_per_100": 5.31,
+  "years": {
+   "2025": {
+    "ret_pct": 53.8,
+    "worst_drop_pct": -13.3,
+    "months_up": "10/12"
+   },
+   "2026": {
+    "ret_pct": -11.3,
+    "worst_drop_pct": -23.1,
+    "months_up": "4/10"
+   }
+  }
+ }
+}

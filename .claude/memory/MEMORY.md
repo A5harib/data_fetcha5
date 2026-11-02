@@ -8,3 +8,5 @@
 - [Next steps](next-steps.md) — open items in priority order
 - [Working with the user](user-preferences.md) — plain language only, the goal is mostly-correct calls for investing
 - [Model 2](model2.md) — self-learning BTC and gold paper bots at /model2 on the Space, backtest, files, how to retrain
+- [Model 3](model3.md) — weekly trend rotation over 7 assets at /model3, 7 weekday sleeves, backtest and why
+- [Model 4](model4.md) — Kronos forecast bots on 7 coins at /model4, live 2026-11-02, torch pin gotcha

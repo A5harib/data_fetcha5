@@ -101,5 +101,18 @@ import model2  # noqa: E402
 
 model2.attach(fastapi_app)
 
+# Model 3: weekly trend rotation over 7 assets, shown at /model3. Same
+# PAPER_BOT switch; state lives under model3/ in PAPER_DATASET.
+import model3  # noqa: E402
+
+model3.attach(fastapi_app)
+
+# Model 4: Kronos (pretrained price-chart model) forecasts on hourly candles,
+# one $100 bot per coin, shown at /model4. Same PAPER_BOT switch; state lives
+# under model4/ in PAPER_DATASET. Runs on CPU, see model4/forecaster.py.
+import model4  # noqa: E402
+
+model4.attach(fastapi_app)
+
 # The Space proxies $PORT, so the API owns it.
 uvicorn.run(fastapi_app, host="0.0.0.0", port=int(os.environ.get("PORT", 7860)))

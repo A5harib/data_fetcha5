@@ -9,3 +9,9 @@ xgboost-cpu>=2.1.0
 scikit-learn>=1.4.0
 joblib>=1.3.2
 pydantic>=2.6.0
+# Model 4 (Kronos). Plain PyPI torch, because ZeroGPU's `spaces` patches the
+# CUDA build; model 4 still runs it on CPU only.
+torch==2.9.1
+einops>=0.8.0
+safetensors>=0.4.0
+tqdm>=4.66.0
